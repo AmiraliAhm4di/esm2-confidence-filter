@@ -1,0 +1,4 @@
+name,path,source,date
+ProteinGym substitution assays,data/raw/DMS_ProteinGym_substitutions,https://proteingym.org/download,8/17/2026
+ProteinGym substitution metadata,data/raw/DMS_substitutions.csv,https://proteingym.org/download,8/17/2026
+ESM-2 Spearman results,data/raw/DMS_substitutions_Spearman_DMS_level.csv,https://github.com/OATML-Markslab/ProteinGym/blob/PG_v1.3/benchmarks/DMS_zero_shot/substitutions/Spearman/DMS_substitutions_Spearman_DMS_level.csv,8/17/2026
