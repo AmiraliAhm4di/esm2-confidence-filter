@@ -39,7 +39,7 @@ I will then normalize these scores so that they form probabilities that sum to 1
 
 ### 7. Random Seed
 
-The project will use a random seed of 42 for assay selection and any later steps involving randomness. This will make the same random choices reproducible when the code is run again.
+The project will use 42 as the random seed for assay selection and any later steps involving randomness. This will make the same random choices reproducible when the code is run again. 42 is just a random number I chose and doesn't have any significance.
 
 ### 8. Comparing with Published Results
 
