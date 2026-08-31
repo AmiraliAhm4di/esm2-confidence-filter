@@ -1,7 +1,10 @@
 # ProteinGym Assay Selection
 
 from pathlib import Path
+import random
+
 import pandas as pd
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_RAW = PROJECT_ROOT / "data" / "raw"
@@ -16,43 +19,12 @@ metadata_table = pd.read_csv(METADATA)
 benchmark_table = pd.read_csv(BENCHMARKS)
 
 downloaded_assays = set()
-metadata_assays = set()
-amount_downloaded = 0
 
-for assays in ASSAYS_DIR.glob("*.csv"):
-    amount_downloaded += 1
-    downloaded_assays.add(assays.name)
+for assay in ASSAYS_DIR.glob("*.csv"):
+    downloaded_assays.add(assay.name)
 
-metadata_assays.update(metadata_table["DMS_filename"].dropna())
-
-amino_acids = ["A", "R", "N", "D", "C", "E", "Q", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V"]
-
-valid_seq = 0
-
-for value in metadata_table["target_seq"]:
-    if not isinstance(value, str):
-        continue
-    if value == "":
-        continue
-
-    valid = True
-
-    for i in value:
-        if i not in amino_acids:
-            valid = False
-            break
-
-    if valid:
-        valid_seq += 1
-
-metadata_dms = set()
-benchmark_dms = set()
-
-metadata_dms.update(metadata_table["DMS_id"].dropna())
-benchmark_dms.update(benchmark_table["DMS ID"].dropna())
-
-import random
-import math
+amino_acids = set("ARNDCEQGHILKMFPSTWYV")
+benchmark_scores = benchmark_table.set_index("DMS ID")["ESM2 (650M)"]
 
 seed = 42
 min_var = 100
@@ -61,141 +33,83 @@ selection = 20
 candidate_rows = []
 excluded_rows = []
 
+
+
+# Check every assay
 for index, metadata_row in metadata_table.iterrows():
     dms_id = metadata_row["DMS_id"]
     dms_filename = metadata_row["DMS_filename"]
     uniprot_id = metadata_row["UniProt_ID"]
     target_seq = metadata_row["target_seq"]
 
-    exclusion_reasons = []
-    esm2_spearman = None
+    exclusion_reason = None
     eligible_var_count = 0
-    eligibility = False
+    esm2_spearman = None
 
-    if pd.isna(dms_filename):
-        exclusion_reasons.append("missing_filename")
-    else:
-        metadata_match_count = (metadata_table["DMS_filename"] == dms_filename).sum()
+    if pd.isna(dms_filename) or dms_filename not in downloaded_assays:
+        exclusion_reason = "missing_assay_file"
 
-        if dms_filename not in downloaded_assays:
-            exclusion_reasons.append("missing_assay_file")
+    elif not isinstance(target_seq, str) or not target_seq:
+        exclusion_reason = "invalid_target_seq"
 
-        if metadata_match_count != 1:
-            exclusion_reasons.append("metadata_match_not_unique")
+    elif not set(target_seq).issubset(amino_acids):
+        exclusion_reason = "invalid_target_seq"
 
-    target_valid = True
+    elif pd.isna(uniprot_id):
+        exclusion_reason = "missing_uniprot_id"
 
-    if not isinstance(target_seq, str):
-        target_valid = False
-
-    elif target_seq == "":
-        target_valid = False
+    elif dms_id not in benchmark_scores.index:
+        exclusion_reason = "missing_esm2_benchmark"
 
     else:
-        for amino_acid in target_seq:
-            if amino_acid not in amino_acids:
-                target_valid = False
-                break
-
-    if not target_valid:
-        exclusion_reasons.append("invalid_target_seq")
-
-    if pd.isna(uniprot_id):
-        exclusion_reasons.append("missing_uniprot_id")
-
-    matching_benchmark_rows = benchmark_table[
-        benchmark_table["DMS ID"] == dms_id
-    ]
-
-    if len(matching_benchmark_rows) == 0:
-        exclusion_reasons.append("missing_esm2_benchmark")
-
-    elif len(matching_benchmark_rows) > 1:
-        exclusion_reasons.append("multiple_esm2_benchmarks")
-
-    else:
-        esm2_spearman = matching_benchmark_rows.iloc[0][
-            "ESM2 (650M)"
-        ]
+        esm2_spearman = benchmark_scores[dms_id]
 
         if pd.isna(esm2_spearman):
-            exclusion_reasons.append("missing_esm2_benchmark")
+            exclusion_reason = "missing_esm2_benchmark"
 
-    assay_path = ASSAYS_DIR / str(dms_filename)
+    if exclusion_reason is None:
+        assay_table = pd.read_csv(ASSAYS_DIR / dms_filename)
+        eligible_mutations = set()
 
-    if assay_path.exists() and target_valid:
-        assay_table = pd.read_csv(assay_path)
+        for variant_index, variant_row in assay_table.iterrows():
+            mutant_value = variant_row["mutant"]
+            dms_score = variant_row["DMS_score"]
 
-        if "mutant" not in assay_table.columns:
-            exclusion_reasons.append("missing_mutant_column")
+            if not isinstance(mutant_value, str):
+                continue
 
-        elif "DMS_score" not in assay_table.columns:
-            exclusion_reasons.append("missing_dms_score_column")
+            if ":" in mutant_value or len(mutant_value) < 3:
+                continue
 
-        else:
-            eligibility = True
-            eligible_mutations = set()
+            wild_type = mutant_value[0]
+            mutant_amino_acid = mutant_value[-1]
+            position_text = mutant_value[1:-1]
 
-            for variant_index, variant_row in assay_table.iterrows():
-                mutant_value = variant_row["mutant"]
-                dms_score = variant_row["DMS_score"]
+            if not position_text.isdigit():
+                continue
 
-                if not isinstance(mutant_value, str):
-                    continue
+            if wild_type not in amino_acids or mutant_amino_acid not in amino_acids:
+                continue
 
-                if ":" in mutant_value:
-                    continue
+            if wild_type == mutant_amino_acid:
+                continue
 
-                if len(mutant_value) < 3:
-                    continue
+            position = int(position_text)
 
-                wild_type = mutant_value[0]
-                mutant_amino_acid = mutant_value[-1]
-                position_text = mutant_value[1:-1]
+            if not 1 <= position <= len(target_seq):
+                continue
 
-                if wild_type not in amino_acids:
-                    continue
+            if target_seq[position - 1] != wild_type or pd.isna(dms_score):
+                continue
 
-                if mutant_amino_acid not in amino_acids:
-                    continue
+            eligible_mutations.add(mutant_value)
 
-                if wild_type == mutant_amino_acid:
-                    continue
+        eligible_var_count = len(eligible_mutations)
 
-                if not position_text.isdigit():
-                    continue
-
-                position = int(position_text)
-
-                if position < 1:
-                    continue
-
-                if position > len(target_seq):
-                    continue
-
-                if target_seq[position - 1] != wild_type:
-                    continue
-
-                if pd.isna(dms_score):
-                    continue
-
-                try:
-                    numeric_dms_score = float(dms_score)
-                except (TypeError, ValueError):
-                    continue
-
-                if not math.isfinite(numeric_dms_score):
-                    continue
-
-                eligible_mutations.add(mutant_value)
-
-            eligible_var_count = len(eligible_mutations)
-
-    if eligibility:
         if eligible_var_count < min_var:
-            exclusion_reasons.append("fewer_than_100_eligible_variants")
+            exclusion_reason = "fewer_than_100_eligible_variants"
 
-    if len(exclusion_reasons) == 0:
+    if exclusion_reason is None:
         candidate_rows.append(
             {
                 "DMS_id": dms_id,
@@ -215,77 +129,43 @@ for index, metadata_row in metadata_table.iterrows():
                 "DMS_filename": dms_filename,
                 "UniProt_ID": uniprot_id,
                 "eligible_variant_count": eligible_var_count,
-                "exclusion_reason": ";".join(exclusion_reasons),
+                "exclusion_reason": exclusion_reason,
             }
         )
 
 candidate_table = pd.DataFrame(candidate_rows)
-
-excluded_table = pd.DataFrame(
-    excluded_rows,
-    columns=[
-        "DMS_id",
-        "DMS_filename",
-        "UniProt_ID",
-        "eligible_variant_count",
-        "exclusion_reason",
-    ],
-)
+excluded_table = pd.DataFrame(excluded_rows)
 
 unique_proteins = sorted(candidate_table["UniProt_ID"].unique())
 
+
 if len(unique_proteins) < selection:
-    raise ValueError(
-        f"Only {len(unique_proteins)} eligible proteins were found. "
-        f"At least {selection} are required."
-    )
+    raise ValueError("Not enough eligible proteins")
 
-random_generator = random.Random(seed)
-
-selected_proteins = random_generator.sample(unique_proteins, selection)
+random.seed(seed)
+selected_proteins = random.sample(unique_proteins, selection)
 
 selected_rows = []
 
 for protein in selected_proteins:
     protein_assays = candidate_table[
         candidate_table["UniProt_ID"] == protein
-    ]
+    ].sort_values("DMS_id")
 
-    protein_assays = protein_assays.sort_values("DMS_id")
-    protein_assays = protein_assays.reset_index(drop=True)
-
-    selected_assay_index = random_generator.randrange(
-        len(protein_assays)
-    )
-
-    selected_assay = protein_assays.iloc[selected_assay_index].to_dict()
-
-
-
-    selected_rows.append(selected_assay)
+    selected_assay_index = random.randrange(len(protein_assays))
+    selected_rows.append(protein_assays.iloc[selected_assay_index].to_dict())
 
 selected_table = pd.DataFrame(selected_rows)
 selected_table["random_seed"] = seed
 selected_table = selected_table.sort_values("DMS_id")
 
+
 CANDIDATE_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
 
 candidate_table.to_csv(CANDIDATE_OUTPUT, index=False)
-
-excluded_table.to_csv(EXCLUSIONS_OUTPUT, index=False,)
+excluded_table.to_csv(EXCLUSIONS_OUTPUT, index=False)
 selected_table.to_csv(SELECTED_CANDIDATES, index=False)
 
-
-print(f"Downloaded assay files: {amount_downloaded}")
-print(f"Valid target sequences: {valid_seq}")
-print(f"Metadata IDs with benchmarks: {len(metadata_dms & benchmark_dms)}")
-print(f"Eligible assays: {len(candidate_table)}")
-print(f"Excluded assays: {len(excluded_table)}")
-print(f"Eligible unique proteins: {len(unique_proteins)}")
-print(f"Selected assays: {len(selected_table)}")
-print(f"Selected unique proteins: {selected_table['UniProt_ID'].nunique()}")
-print(f"Random seed: {seed}")
-print()
-print(f"Saved candidate pool to: {CANDIDATE_OUTPUT}")
-print(f"Saved exclusions to: {EXCLUSIONS_OUTPUT}")
-print(f"Saved final selection to: {SELECTED_CANDIDATES}")
+print(f"""Eligible assays: {len(candidate_table)}""")
+print(f"""Excluded assays: {len(excluded_table)}""")
+print(f"""Selected assays: {len(selected_table)}""")
