@@ -1,0 +1,2 @@
+DMS_id,model,n_variants,local_spearman,published_spearman,absolute_difference,tolerance,result
+A4GRB6_PSEAI_Chen_2020,ESM2 (650M),5004,0.7381503609961976,0.738,0.00015036099619758492,0.02,PASS
