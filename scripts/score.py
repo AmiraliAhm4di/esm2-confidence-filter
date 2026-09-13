@@ -15,7 +15,7 @@ CACHE_DIR = PROJECT_ROOT / "outputs" / "position_cache"
 SCORED_DIR = PROJECT_ROOT / "outputs" / "scored"
 
 MODEL = "facebook/esm2_t33_650M_UR50D"
-DMS_ID = "A4GRB6_PSEAI_Chen_2020"
+DMS_ID = "GLPA_HUMAN_Elazar_2016"
 BATCH_SIZE = 2
 
 amino_acids = ["A", "R", "N", "D", "C", "E", "Q", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V"]

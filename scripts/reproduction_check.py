@@ -1,50 +1,64 @@
-# Full-coverage reproduction check
+# Three-assay reproduction check
 
 from pathlib import Path
 import pandas as pd
 from scipy.stats import spearmanr
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-ASSAY = "A4GRB6_PSEAI_Chen_2020"
-SCORED = PROJECT_ROOT / "outputs" / "scored" / (ASSAY + ".csv")
-BENCHMARKS = PROJECT_ROOT / "data" / "raw" / "DMS_substitutions_Spearman_DMS_level.csv"
-OUTPUT = PROJECT_ROOT / "outputs" / "reproduction_smoke.csv"
+SCORED_DIR = PROJECT_ROOT / "outputs" / "scored"
+BENCHMARKS = (PROJECT_ROOT / "data" / "raw" / "DMS_substitutions_Spearman_DMS_level.csv")
+OUTPUT = PROJECT_ROOT / "outputs" / "reproduction_three_assay.csv"
 TOLERANCE = 0.02
 
-scored_table = pd.read_csv(SCORED)
+assays = ["A4GRB6_PSEAI_Chen_2020", "AACC1_PSEAI_Dandage_2018", "GLPA_HUMAN_Elazar_2016",]
+
 benchmark_table = pd.read_csv(BENCHMARKS)
-model_scores = scored_table["esm2_score"]
-experimental_scores = scored_table["DMS_score"]
+report_rows = []
+for assay in assays:
+    scored_path = SCORED_DIR / (assay + ".csv")
+    scored_table = pd.read_csv(scored_path)
 
-correlation = spearmanr(model_scores, experimental_scores)
-local_spearman = correlation.statistic
-benchmark_row = benchmark_table[benchmark_table["DMS ID"] == ASSAY]
-published_spearman = benchmark_row["ESM2 (650M)"].iloc[0]
-absolute_difference = abs(local_spearman - published_spearman)
+    model_scores = scored_table["esm2_score"]
+    experimental_scores = scored_table["DMS_score"]
 
-if absolute_difference <= TOLERANCE:
-    result = "PASS"
-else:
-    result = "FAIL"
+    correlation = spearmanr(model_scores, experimental_scores)
+    local_spearman = correlation.statistic
 
-report_data = {
-    "DMS_id": ASSAY,
-    "model": "ESM2 (650M)",
-    "n_variants": len(scored_table),
-    "local_spearman": local_spearman,
-    "published_spearman": published_spearman,
-    "absolute_difference": absolute_difference,
-    "tolerance": TOLERANCE,
-    "result": result
-}
-report = pd.DataFrame([report_data])
+    benchmark_row = benchmark_table[benchmark_table["DMS ID"] == assay]
+    published_spearman = benchmark_row["ESM2 (650M)"].iloc[0]
+    published_variant_count = benchmark_row["Number of Mutants"].iloc[0]
+
+    local_variant_count = len(scored_table)
+    absolute_difference = abs(local_spearman - published_spearman)
+    row_count_match = local_variant_count == published_variant_count
+
+    if row_count_match == False:
+        result = "ROW_COUNT_MISMATCH"
+    elif absolute_difference <= TOLERANCE:
+        result = "PASS"
+    else:
+        result = "FAIL"
+
+    report_data = {
+        "DMS_id": assay,
+        "model": "ESM2 (650M)",
+        "local_variants": local_variant_count,
+        "published_variants": published_variant_count,
+        "row_count_match": row_count_match,
+        "local_spearman": local_spearman,
+        "published_spearman": published_spearman,
+        "absolute_difference": absolute_difference,
+        "tolerance": TOLERANCE,
+        "result": result,
+    }
+
+    report_rows.append(report_data)
+
+
+
+report = pd.DataFrame(report_rows)
 report.to_csv(OUTPUT, index=False)
 
-print(f"Assay: {ASSAY}")
-print(f"Variants: {len(scored_table)}")
-print(f"Local Spearman: {local_spearman:.6f}")
-print(f"Published Spearman: {published_spearman}")
-print(f"Absolute difference: {absolute_difference:.6f}")
-print(f"Tolerance: {TOLERANCE}")
-print(f"Result: {result}")
-print(f"Saved: {OUTPUT}")
+print(report.to_string(index=False))
+print(f"\nSaved: {OUTPUT}")
