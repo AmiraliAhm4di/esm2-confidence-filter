@@ -1,0 +1,11 @@
+{
+  "assays": 20,
+  "scored_rows": 63466,
+  "exact_duplicates_excluded": 0,
+  "multi_mutants_excluded": 511098,
+  "benchmark_pass": 15,
+  "benchmark_not_comparable_multi_mutant": 5,
+  "benchmark_fail": 0,
+  "max_absolute_difference_comparable": 0.0010627087322863937,
+  "integrity_status": "PASS"
+}
