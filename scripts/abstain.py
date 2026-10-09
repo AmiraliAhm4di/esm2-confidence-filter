@@ -6,7 +6,6 @@ from scipy.stats import spearmanr
 import math
 import sys
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS = PROJECT_ROOT / "outputs"
 SCORED = OUTPUTS / "scored_variants_all.csv"
@@ -140,7 +139,7 @@ def self_test():
 
 
 
-if __name__ == "__main__":
+def main():
     self_test()
 
     if "--self-test" not in sys.argv:
@@ -153,3 +152,7 @@ if __name__ == "__main__":
         print(f"Wrote {CURVE}: {len(curve)} assay/coverage results")
         print(f"Wrote {RANKING}: {len(ranking)} ranked variants")
         print("50% retention uses ceil(n/2); ties use ascending source_row.")
+
+
+if __name__ == "__main__":
+    main()

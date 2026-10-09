@@ -8,7 +8,6 @@ from scripts.parser import mutation_parser
 from scripts.parser import mutation_validator
 from scripts.parser import mutated_seq_validator
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ASSAYS_DIR = (PROJECT_ROOT / "data" / "raw" / "DMS_ProteinGym_substitutions")
 FINAL_SELECTION = (PROJECT_ROOT / "outputs" / "final_selection.csv")
@@ -79,8 +78,13 @@ for index, selected_row in selected_table.iterrows():
                 }
             )
 
-parsed_table = pd.DataFrame(eligible_rows)
-excluded_table = pd.DataFrame(excluded_rows)
+parsed_table = pd.DataFrame(eligible_rows, columns=[
+    "DMS_id", "DMS_filename", "UniProt_ID", "source_row", "mutation",
+    "wild_type", "position", "mutant", "DMS_score",
+])
+excluded_table = pd.DataFrame(excluded_rows, columns=[
+    "DMS_id", "DMS_filename", "mutation", "source_row", "exclusion_reason",
+])
 
 parsed_table.to_csv(PARSED_OUTPUT, index=False)
 excluded_table.to_csv(EXCLUDED_OUTPUT, index=False)

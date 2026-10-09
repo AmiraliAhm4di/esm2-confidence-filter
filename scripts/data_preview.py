@@ -1,4 +1,3 @@
-import csv
 from pathlib import Path
 import pandas as pd
 
@@ -7,7 +6,6 @@ DATA_RAW = PROJECT_ROOT / "data" / "raw"
 
 metadata = pd.read_csv(DATA_RAW / "DMS_substitutions.csv")
 assay = pd.read_csv(DATA_RAW / "DMS_ProteinGym_substitutions/A0A1I9GEU1_NEIME_Kennouche_2019.csv")
-
 
 print(metadata.shape)
 print(metadata.columns.tolist())

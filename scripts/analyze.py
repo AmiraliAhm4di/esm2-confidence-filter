@@ -17,6 +17,8 @@ def bootstrap_ci(values):
     values = np.array(values, dtype=float)
     if len(values) < 2:
         raise ValueError("Need at least two assays for a bootstrap interval")
+    if not np.isfinite(values).all():
+        raise ValueError("Need finite values for a bootstrap interval")
 
     rng = np.random.default_rng(seed)
     means = []
@@ -36,7 +38,7 @@ def calculate_aurc(rhos, actual_coverage):
     return area
 
 
-if __name__ == "__main__":
+def main():
 
     reproduction = pd.read_csv(OUTPUTS / "reproduction_all.csv")
     balance = pd.read_csv(OUTPUTS / "controlled_balance.csv")
@@ -50,6 +52,8 @@ if __name__ == "__main__":
     usable = balance[balance["usable"] == True]
     all_assays = sorted(reproduction["DMS_id"].tolist())
     controlled_assays = sorted(usable["DMS_id"].tolist())
+    if len(controlled_assays) < 2:
+        raise ValueError("Need at least two usable assays after matching")
 
     groups = {
         "uncontrolled_all": all_assays,
@@ -103,7 +107,11 @@ if __name__ == "__main__":
             for coverage in coverages:
                 saved = draws[draws["requested_coverage_percent"] == coverage]
                 saved = saved.sort_values("draw_id")
+                if saved["draw_id"].tolist() != list(range(1, random_draws + 1)):
+                    raise ValueError(assay + ": invalid draw IDs at " + str(coverage) + "%")
                 values = saved["rho"].to_numpy()
+                if not np.isfinite(values).all():
+                    raise ValueError(assay + ": nonfinite random correlations at " + str(coverage) + "%")
                 random_rhos[coverage] = values[draw_order]
                 random_rho_sum[coverage] += random_rhos[coverage]
 
@@ -227,7 +235,7 @@ if __name__ == "__main__":
             proxy_pattern = True
 
     if after["positive"]:
-        conclusion = "the entropy filter still helped after matching"
+        conclusion = "The entropy filter helped in this matched subset"
     elif proxy_pattern:
         conclusion = "the earlier gain got smaller after matching so entropy may be picking up which positions tolerate changes"
     
@@ -235,6 +243,13 @@ if __name__ == "__main__":
         conclusion = "the entropy filter made the rankings worse after matching"
     else:
         conclusion = "we did not see a clear improvement after matching"
+
+    if change_low <= 0 <= change_high:
+        change_interpretation = "The paired interval includes zero, so a change in the advantage after matching was not clearly established."
+    elif change_low > 0:
+        change_interpretation = "The paired interval supports a larger advantage after matching."
+    else:
+        change_interpretation = "The paired interval supports a smaller advantage after matching."
 
     memo = [
         (
@@ -244,19 +259,21 @@ if __name__ == "__main__":
             "their published results include multiple mutations."
         ),
         (
-            f"Before matching, the mean Spearman change at 50% requested coverage was "
+            f"Across all {len(all_assays)} assays before matching, the mean Spearman "
+            f"change at 50% requested coverage was "
             f"{all_result['mean_delta_rho_50']:+.4f} "
             f"(95% assay-bootstrap interval [{all_result['delta_ci_low']:+.4f}, "
             f"{all_result['delta_ci_high']:+.4f}])."
         ),
         (
-            f"For the same {len(controlled_assays)} assays, the 95% range of Spearman "
-            f"changes from random retention was [{before['random_delta_q025']:+.4f}, "
+            f"For the same {len(controlled_assays)} assays, the mean Spearman change "
+            f"at 50% requested coverage before matching was {before['mean_delta_rho_50']:+.4f}. "
+            f"The 95% range of changes from random retention was [{before['random_delta_q025']:+.4f}, "
             f"{before['random_delta_q975']:+.4f}] before matching and "
             f"[{after['random_delta_q025']:+.4f}, {after['random_delta_q975']:+.4f}] "
             f"after matching. Entropy's advantage over random changed by "
             f"{np.mean(changes):+.4f} (95% assay-bootstrap interval "
-            f"[{change_low:+.4f}, {change_high:+.4f}])."
+            f"[{change_low:+.4f}, {change_high:+.4f}]). {change_interpretation}"
         ),
         (
             f"Within each assay, we compared entropy with the mean absolute experimental "
@@ -268,10 +285,11 @@ if __name__ == "__main__":
             f"{int(usable['original_variants'].sum())} variants from those assays."
         ),
         (
-            f"After matching the mean Spearman change at 50% requested coverage was "
+            f"Within the {len(controlled_assays)} matched assays, the mean Spearman "
+            f"change at 50% requested coverage was "
             f"{after['mean_delta_rho_50']:+.4f} (95% assay-bootstrap interval "
             f"[{after['delta_ci_low']:+.4f}, {after['delta_ci_high']:+.4f}]), and mean "
-            f"AURC was "
+            f"AURC over {coverages[0]}-{coverages[-1]}% requested coverage was "
             f"{after['mean_entropy_aurc']:.4f} versus {after['mean_random_aurc']:.4f} "
             f"for random retention (lower is better). {conclusion}."
         ),
@@ -286,3 +304,7 @@ if __name__ == "__main__":
 
     print("Wrote", OUTPUTS / "headline_table.csv")
     print("Wrote", OUTPUTS / "results_memo.txt")
+
+
+if __name__ == "__main__":
+    main()

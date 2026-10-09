@@ -2,8 +2,13 @@
 
 from pathlib import Path
 import random
+import math
 
 import pandas as pd
+if __package__:
+    from scripts.parser import mutated_seq_validator
+else:
+    from parser import mutated_seq_validator
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +21,9 @@ EXCLUSIONS_OUTPUT = PROJECT_ROOT / "outputs" / "excluded_candidates.csv"
 SELECTED_CANDIDATES = PROJECT_ROOT / "outputs" / "final_selection.csv"
 
 metadata_table = pd.read_csv(METADATA)
+duplicate_filenames = set(metadata_table.loc[
+    metadata_table["DMS_filename"].duplicated(keep=False), "DMS_filename"
+])
 benchmark_table = pd.read_csv(BENCHMARKS)
 
 downloaded_assays = set()
@@ -48,6 +56,9 @@ for index, metadata_row in metadata_table.iterrows():
 
     if pd.isna(dms_filename) or dms_filename not in downloaded_assays:
         exclusion_reason = "missing_assay_file"
+
+    elif dms_filename in duplicate_filenames:
+        exclusion_reason = "duplicate_metadata_filename"
 
     elif not isinstance(target_seq, str) or not target_seq:
         exclusion_reason = "invalid_target_seq"
@@ -100,6 +111,17 @@ for index, metadata_row in metadata_table.iterrows():
                 continue
 
             if target_seq[position - 1] != wild_type or pd.isna(dms_score):
+                continue
+
+            try:
+                dms_score = float(dms_score)
+                mutated_seq_validator(
+                    target_seq, variant_row.get("mutated_sequence"), position, mutant_amino_acid
+                )
+            except (TypeError, ValueError):
+                continue
+
+            if not math.isfinite(dms_score):
                 continue
 
             eligible_mutations.add(mutant_value)

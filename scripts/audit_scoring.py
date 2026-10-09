@@ -1,8 +1,6 @@
 # Audit the 20 scored assays and combine them
 
 from pathlib import Path
-import torch
-from transformers import AutoTokenizer, AutoModelForMaskedLM
 import hashlib
 import json
 import math
@@ -10,8 +8,6 @@ import sys
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
-
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS = PROJECT_ROOT / "outputs"
@@ -22,7 +18,6 @@ SCORING_MANIFEST = OUTPUTS / "scoring_manifest.csv"
 BENCHMARKS = PROJECT_ROOT / "data" / "raw" / "DMS_substitutions_Spearman_DMS_level.csv"
 SCORED_DIR = OUTPUTS / "scored"
 CACHE_DIR = OUTPUTS / "position_cache"
-
 
 COMBINED_OUTPUT = OUTPUTS / "scored_variants_all.csv"
 REPRODUCTION_OUTPUT = OUTPUTS / "reproduction_all.csv"
@@ -166,6 +161,8 @@ else:
         local_spearman = float(spearmanr(scored_table["esm2_score"], scored_table["DMS_score"]).statistic)
         published_spearman = float(benchmark_row["ESM2 (650M)"])
         published_variants = int(benchmark_row["Number of Mutants"])
+        if not math.isfinite(local_spearman) or not math.isfinite(published_spearman):
+            raise ValueError(dms_id + ": undefined or nonfinite Spearman")
         absolute_difference = abs(local_spearman - published_spearman)
         excluded_multi = int((excluded_assay["exclusion_reason"] == "multi_mutant").sum())
 

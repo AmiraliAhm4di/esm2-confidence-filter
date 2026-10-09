@@ -1,6 +1,10 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv-install-check/
+build/
+*.egg-info/
+.pytest_cache/
 .env
 .vscode/
 

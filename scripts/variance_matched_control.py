@@ -6,7 +6,6 @@ from scipy.stats import spearmanr
 import math
 import numpy as np
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS = PROJECT_ROOT / "outputs"
 SCORED = OUTPUTS / "scored_variants_all.csv"
@@ -83,6 +82,8 @@ if __name__ == "__main__":
     position_rows = []
     position_groups = scored_table.groupby(["DMS_id", "position"])
     for (assay, position), position_table in position_groups:
+        if not np.isfinite(position_table["entropy"]).all() or position_table["entropy"].nunique() != 1:
+            raise ValueError(assay + ": inconsistent or nonfinite entropy at position " + str(position))
         position_rows.append([
             assay,
             position,

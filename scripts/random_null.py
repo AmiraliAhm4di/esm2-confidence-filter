@@ -6,7 +6,6 @@ from scipy.stats import spearmanr
 import math
 import numpy as np
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS = PROJECT_ROOT / "outputs"
 SCORED = OUTPUTS / "scored_variants_all.csv"

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "esm2-confidence-filter"
+version = "0.1.0"
+description = "Entropy-based filtering of ESM-2 variant predictions"
+requires-python = ">=3.10"
+dependencies = [
+    "torch==2.13.0",
+    "transformers==5.16.1",
+    "pandas==2.3.3",
+    "numpy==2.2.6",
+    "scipy==1.15.3",
+    "matplotlib==3.10.9",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1"]
+
+[project.scripts]
+esm2-score = "scripts.score:main"
+esm2-abstain = "scripts.abstain:main"
+esm2-analyze = "scripts.analyze:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scripts"]
+namespaces = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

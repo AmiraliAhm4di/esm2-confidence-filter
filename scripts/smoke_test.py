@@ -3,11 +3,9 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForMaskedLM
 
-
 MODEL = "facebook/esm2_t33_650M_UR50D"
 tokenizer = AutoTokenizer.from_pretrained(MODEL)
 model = AutoModelForMaskedLM.from_pretrained(MODEL)
-
 
 model = model.to("cuda")
 model = model.half()

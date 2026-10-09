@@ -19,12 +19,17 @@ if len(usable_assays) == 0:
     raise ValueError("No assays passed the variance-matched control.")
 
 groups = [
-    ("uncontrolled_all", "All assays"),
-    ("uncontrolled_control_eligible", "Before matching"),
-    ("controlled_usable", "After matching"),
+    ("uncontrolled_all", f"All assays (n={len(reproduction)})"),
+    ("uncontrolled_control_eligible", f"Before matching (n={len(usable_assays)})"),
+    ("controlled_usable", f"After matching (n={len(usable_assays)})"),
 ]
 
 fig, axes = plt.subplots(2, 3, figsize=(15, 9))
+plotted_coverage = coverage[coverage["analysis"].isin([group[0] for group in groups])]
+risk_limits = [
+    1 - plotted_coverage[["mean_entropy_rho", "random_rho_q975"]].max().max() - 0.01,
+    1 - plotted_coverage[["mean_entropy_rho", "random_rho_q025"]].min().min() + 0.01,
+]
 
 for i in range(3):
     group_name, title = groups[i]
@@ -32,6 +37,8 @@ for i in range(3):
     rows = rows.sort_values("requested_coverage_percent")
     if rows.empty:
         raise ValueError("Missing coverage results for " + group_name)
+    if rows["requested_coverage_percent"].tolist() != list(range(10, 101, 10)):
+        raise ValueError("Need ten unique coverage levels for " + group_name)
 
     x = rows["mean_actual_coverage"].to_numpy() * 100
     entropy_risk = 1 - rows["mean_entropy_rho"].to_numpy()
@@ -42,7 +49,7 @@ for i in range(3):
 
     ax = axes[0, i]
     ax.fill_between(x, random_low, random_high, color="gray", alpha=0.25,
-                    label="Random 95% band")
+                    label="Random retention: 95% range")
     ax.plot(x, random_risk, color="gray", linestyle="--",
             label="Random median")
     ax.plot(x, entropy_risk, color="teal", marker="o",
@@ -50,8 +57,9 @@ for i in range(3):
     ax.axvline(50, color="lightgray", linestyle=":")
     ax.set_title(title)
     ax.set_xlabel("Coverage (%)")
-    ax.set_ylabel("Risk (1 - Spearman)")
+    ax.set_ylabel("1 - mean Spearman rho\n(lower is better)")
     ax.set_xlim(5, 103)
+    ax.set_ylim(risk_limits)
     ax.grid(alpha=0.2)
 
 axes[0, 0].legend(fontsize=8)
@@ -68,7 +76,8 @@ ax = axes[1, 0]
 ax.barh(range(len(confound)),
         confound["spearman_entropy_vs_mean_abs_effect"], color=bar_colors)
 ax.axvline(0, color="black", linewidth=0.8)
-ax.set_yticks([])
+assay_labels = confound["DMS_id"].str.split("_").str[0]
+ax.set_yticks(range(len(confound)), assay_labels, fontsize=7)
 ax.set_xlabel("Within-assay Spearman rho")
 ax.set_title("Entropy vs. mutation effect")
 ax.text(0.02, 0.04, "Teal = assays retained by matching",
@@ -85,6 +94,8 @@ for assay in usable_assays:
         (per_assay["analysis"] == "controlled_usable")
         & (per_assay["DMS_id"] == assay)
     ]
+    if len(before_rows) != 1 or len(after_rows) != 1:
+        raise ValueError("Need one before and after result for " + assay)
     before = before_rows["excess_over_random"].iloc[0]
     after = after_rows["excess_over_random"].iloc[0]
     ax.plot([0, 1], [before, after], color="gray", marker="o")
@@ -99,20 +110,23 @@ ax.grid(axis="y", alpha=0.2)
 usable_balance = balance[balance["usable"] == True]
 original_count = int(usable_balance["original_variants"].sum())
 matched_count = int(usable_balance["matched_variants"].sum())
+retained_percent = 100 * matched_count / original_count
 
 ax = axes[1, 2]
 ax.barh([1, 0], [original_count, matched_count],
         color=["gray", "teal"])
 ax.set_yticks([1, 0], ["Before", "Matched"])
 ax.set_xlabel("Number of variants")
-ax.set_title("Variants left after matching")
+ax.set_title(f"Variants in the same {len(usable_assays)} matched assays")
 ax.set_xlim(0, original_count * 1.25)
 ax.text(original_count, 1, f"  {original_count:,}", va="center")
-ax.text(matched_count, 0, f"  {matched_count:,}", va="center")
+ax.text(matched_count, 0, f"  {matched_count:,}\n  {retained_percent:.1f}% retained", va="center")
 ax.grid(axis="x", alpha=0.2)
 
 fig.suptitle("Entropy filtering results", fontsize=15)
-fig.tight_layout(rect=[0, 0, 1, 0.95])
+fig.tight_layout(rect=[0, 0.04, 1, 0.95])
+fig.text(0.5, 0.01, "Top panels give each assay equal weight; shading shows pointwise 2.5-97.5% ranges over random retention draws.",
+         ha="center", fontsize=8)
 
 figure_file = outputs / "final_analysis.png"
 fig.savefig(figure_file, dpi=200)

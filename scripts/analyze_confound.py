@@ -6,7 +6,6 @@ from scipy.stats import spearmanr
 import numpy as np
 import matplotlib.pyplot as plt
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS = PROJECT_ROOT / "outputs"
 SCORED = OUTPUTS / "scored_variants_all.csv"
@@ -26,6 +25,8 @@ position_rows = []
 position_groups = scored_table.groupby(["DMS_id", "position"])
 
 for (assay, position), position_table in position_groups:
+    if not np.isfinite(position_table["entropy"]).all() or position_table["entropy"].nunique() != 1:
+        raise ValueError(assay + ": inconsistent or nonfinite entropy at position " + str(position))
     report_data = {
         "DMS_id": assay,
         "position": position,
@@ -51,6 +52,8 @@ summary_rows = []
 for assay in assays:
     assay_table = position_summary[position_summary["DMS_id"] == assay]
     correlation = spearmanr(assay_table["entropy"], assay_table["mean_abs_DMS_score"])
+    if not np.isfinite(correlation.statistic):
+        raise ValueError(assay + ": undefined confound Spearman correlation")
 
     report_data = {
         "DMS_id": assay,
@@ -74,13 +77,13 @@ for index, assay in enumerate(assays):
     plt.scatter(assay_table["entropy"], assay_table["mean_abs_DMS_score"], s=7, alpha=0.35)
 
     rho = summary_table[summary_table["DMS_id"] == assay]["spearman_entropy_vs_mean_abs_effect"].iloc[0]
-    plt.title(f"{assay}\nn={len(assay_table)} positions; rho={rho:.2f}", fontsize=8)
+    plt.title(f"{assay}\nn={len(assay_table)} scored positions; rho={rho:.2f}", fontsize=8)
     plt.xlabel("Positional entropy", fontsize=8)
     plt.ylabel("Mean |DMS_score|", fontsize=8)
     plt.tick_params(labelsize=7)
 
-plt.suptitle("Entropy vs. experimental effect magnitude, one point per position", fontsize=13)
-plt.tight_layout()
+plt.suptitle("Entropy vs. absolute experimental score; one point per position with scored variants", fontsize=13)
+plt.tight_layout(rect=[0, 0, 1, 0.96])
 plt.savefig(SCATTER_OUTPUT, dpi=180)
 plt.close()
 
@@ -94,16 +97,18 @@ for assay in assays:
 
 plt.figure(figsize=(16, 9))
 plt.subplot(1, 2, 1)
-plt.boxplot(entropy_groups, vert=False)
+plt.boxplot(entropy_groups, vert=False, flierprops={"markersize": 3, "alpha": 0.5})
+plt.xlabel("Entropy (nats)")
 plt.yticks(range(1, 21), assays, fontsize=8)
 plt.title("Positional entropy")
 
 plt.subplot(1, 2, 2)
-plt.boxplot(effect_groups, vert=False)
+plt.boxplot(effect_groups, vert=False, flierprops={"markersize": 3, "alpha": 0.5})
+plt.xlabel("Mean absolute DMS score per position")
 plt.yticks(range(1, 21), assays, fontsize=8)
 plt.title("Position mean |DMS_score|")
 
-plt.suptitle("Per-assay distributions; each position has equal weight", fontsize=13)
+plt.suptitle("Per-assay distributions; positions with scored variants have equal weight", fontsize=13)
 plt.tight_layout()
 plt.savefig(DISTRIBUTION_OUTPUT, dpi=180)
 plt.close()
