@@ -7,7 +7,7 @@
     "outputs/excluded_variants.csv": "ab81e88beca1ee7c7ce72e266702f65416ebd7e0bd38403dc219b3b606efe8b1",
     "outputs/scoring_manifest.csv": "5bfe159a5f033559190e36a1be40c19ca637cf3498927cd350bb273379462eb8",
     "data/raw/DMS_substitutions_Spearman_DMS_level.csv": "f432423b87f79ac9778dfac86e3d95be041d246bc618dc0a406b35b0b7466437",
-    "METHODS.md": "ddb866e6ce7661c1c2aa44b33a8318d6e300b69bfee3adea2a931685630b684b",
+    "METHODS_OLD.md": "ddb866e6ce7661c1c2aa44b33a8318d6e300b69bfee3adea2a931685630b684b",
     "outputs/scored/A4GRB6_PSEAI_Chen_2020.csv": "ab5cdbe83e78a21b264b6955f6d6c58d0630161240921a53cb4d20bd8b55b142",
     "outputs/scored/A4GRB6_PSEAI_Chen_2020_duplicates.csv": "a3fff2d332080ab79ffd2ea5b1ad418ded9db9d0b825c8ea608274a547e4d618",
     "outputs/position_cache/A4GRB6_PSEAI_Chen_2020.json": "062e1d10feebde619a0c424d66e7246a77e72c9d6f5c2b47a6e45c23bfb52514",
